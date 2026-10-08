@@ -3,1257 +3,173 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>TIRO CON ARCO Y RECORRIDO VR - BOSQUE Y MONTAÑA</title>
-    <link rel="stylesheet" href="style.css">
-
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>Tiro con Arco VR - Redmi Note 11 & VR Shinecon</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-
-    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800;900&family=Rajdhani:wght@500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { margin: 0; overflow: hidden; background: #000; font-family: sans-serif; }
+        .reticle {
+            position: absolute; top: 50%; left: 25%; transform: translate(-50%, -50%);
+            width: 12px; height: 12px; border: 2px solid rgba(255,255,255,0.8);
+            border-radius: 50%; pointer-events: none; z-index: 10; display: none;
+        }
+        .reticle-right { left: 75%; }
+    </style>
 </head>
-<body class="bg-emerald-950 text-white select-none">
+<body class="select-none">
 
-    <div id="canvas-container" class="w-full h-full absolute inset-0 z-0"></div>
+    <div id="canvas-container"></div>
 
-    <div id="crosshair" class="hidden"></div>
+    <!-- Puntos de mira para cada ojo en pantalla dividida -->
+    <div id="reticle-l" class="reticle"></div>
+    <div id="reticle-r" class="reticle reticle-right"></div>
 
-    <div id="hud-overlay" class="absolute inset-0 pointer-events-none z-10 flex flex-col justify-between p-4 md:p-6 hidden">
-        <div class="flex justify-between items-start w-full max-w-6xl mx-auto">
-            <div class="glass-panel p-3 md:p-4 rounded-xl w-48 md:w-60">
-                <div class="flex justify-between items-center mb-1">
-                    <span class="text-xs font-bold text-emerald-400 tracking-wider">FLECHAS RESTANTES</span>
-                    <span id="arrows-count" class="text-lg font-black text-amber-400 font-cinzel">10 / 10</span>
-                </div>
-                <div class="text-xs text-gray-300 font-mono">DIFICULTAD: <span id="hud-diff" class="text-emerald-300 font-bold uppercase">NORMAL</span></div>
-            </div>
-
-            <div class="glass-panel px-6 py-2 rounded-xl text-center border-emerald-500/40">
-                <span class="text-xs text-emerald-300 uppercase tracking-widest block font-bold">VIENTO EN ANEMÓMETRO</span>
-                <div class="flex items-center justify-center space-x-2 my-1">
-                    <span id="wind-arrow" class="text-xl text-amber-400 font-bold transform inline-block transition-transform duration-300">➔</span>
-                    <span id="wind-speed" class="text-lg md:text-2xl font-bold text-white font-mono">0 km/h</span>
-                </div>
-            </div>
-
-            <div class="glass-panel p-3 md:p-4 rounded-xl w-40 md:w-56 text-right">
-                <span class="text-xs font-bold text-emerald-400 tracking-wider block mb-1">PUNTAJE TOTAL</span>
-                <span id="score-display" class="text-2xl md:text-3xl font-black font-cinzel text-amber-300 gold-glow">000</span>
-            </div>
-        </div>
-
-        <div class="flex justify-between items-end w-full max-w-6xl mx-auto">
-            <div class="glass-panel p-3 rounded-xl w-52 md:w-64">
-                <div class="flex justify-between items-center mb-1">
-                    <span class="text-xs font-bold text-emerald-400">TENSIÓN DE ARCO</span>
-                    <span id="power-value" class="text-xs text-amber-300 font-mono">0%</span>
-                </div>
-                <div class="w-full bg-gray-900 h-3 rounded-full overflow-hidden border border-emerald-900/50">
-                    <div id="power-bar" class="bg-gradient-to-r from-emerald-500 via-amber-400 to-red-500 h-full w-0 transition-all duration-75"></div>
-                </div>
-            </div>
-
-            <button id="exit-hud-btn" class="pointer-events-auto glass-panel px-4 py-2 rounded-xl text-xs text-emerald-300 hover:text-white font-bold tracking-wider hover:bg-emerald-800/40 transition">
-                🚪 MENÚ PRINCIPAL
-            </button>
-        </div>
-    </div>
-
-    <div id="tour-hud-overlay" class="absolute inset-0 pointer-events-none z-10 flex flex-col justify-between p-4 md:p-6 hidden">
-        <div class="glass-panel p-4 rounded-xl max-w-lg mx-auto text-center pointer-events-auto border-emerald-500/50">
-            <h2 id="tour-location-title" class="text-xl md:text-2xl font-bold font-cinzel text-amber-300 mb-1">EL RÍO FRONDOSO</h2>
-            <p id="tour-location-desc" class="text-xs text-emerald-200/90 mb-3">Explora las orillas cristalinas rodeadas de flora silvestre y piedras centenarias.</p>
-            
-            <div class="flex justify-center gap-2">
-                <button onclick="switchTourLocation('rio')" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-900/60 hover:bg-emerald-700/80 text-emerald-200 border border-emerald-500/40 transition">
-                    🌊 1. El Río
-                </button>
-                <button onclick="switchTourLocation('bosque')" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-900/60 hover:bg-emerald-700/80 text-emerald-200 border border-emerald-500/40 transition">
-                    🌲 2. El Bosque
-                </button>
-                <button onclick="switchTourLocation('montana')" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-900/60 hover:bg-emerald-700/80 text-emerald-200 border border-emerald-500/40 transition">
-                    🏔️ 3. Cima Montaña
-                </button>
-            </div>
-        </div>
-
-        <div class="flex justify-between items-center w-full max-w-5xl mx-auto pointer-events-auto">
-            <div class="glass-panel px-4 py-2 rounded-xl text-xs text-emerald-300 font-mono">
-                💡 <span class="hidden md:inline">Usa WASD o control VR/Bluetooth para caminar. Presiona ESC para usar el cursor.</span>
-            </div>
-            <button id="exit-tour-btn" class="glass-panel px-5 py-2.5 rounded-xl text-xs font-bold text-amber-300 hover:bg-emerald-800/50 transition">
-                🚪 VOLVER AL MENÚ
-            </button>
-        </div>
-    </div>
-
-    <div id="mobile-controls" class="absolute bottom-6 left-6 right-6 z-20 flex justify-between items-end pointer-events-none hidden md:hidden">
-        <div id="touch-move-area" class="w-28 h-28 glass-panel rounded-full relative pointer-events-auto flex items-center justify-center opacity-70">
-            <div id="touch-move-stick" class="w-10 h-10 bg-emerald-400/50 rounded-full border border-emerald-200"></div>
-        </div>
-        <button id="mobile-shoot-btn" class="touch-btn w-20 h-20 pointer-events-auto active:scale-95 text-xs font-bold font-cinzel">
-            TENSAR / DISPARAR
+    <!-- Pantalla de Inicio -->
+    <div id="overlay" class="absolute inset-0 bg-emerald-950/90 flex flex-col justify-center items-center p-6 text-center z-20">
+        <h1 class="text-3xl font-bold text-amber-400 mb-2">TIRO CON ARCO VR</h1>
+        <p class="text-emerald-200 text-sm mb-6 max-w-xs">Diseñado para Redmi Note 11 + Visor VR Shinecon</p>
+        
+        <button id="start-btn" class="w-full max-w-xs py-4 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-base uppercase shadow-lg transition transform active:scale-95 mb-4">
+            🚀 INICIAR EN VR (PANTALLA DIVIDIDA)
         </button>
-    </div>
 
-    <div id="menu-overlay" class="absolute inset-0 z-30 flex items-center justify-center bg-emerald-950/85 backdrop-blur-md p-4">
-        <div class="glass-panel p-6 md:p-10 rounded-2xl max-w-xl w-full text-center border-emerald-500/40 relative overflow-hidden">
-            <h1 class="text-3xl md:text-5xl font-black font-cinzel text-transparent bg-clip-text bg-gradient-to-r from-emerald-300 via-amber-300 to-emerald-400 mb-2 tracking-wider">
-                TIRO CON ARCO VR
-            </h1>
-            <p class="text-emerald-200/90 mb-6 text-xs md:text-sm">
-                Experimenta la precisión de la arquería en el bosque y explora tres majestuosos paisajes naturales.
-            </p>
-
-            <div class="grid grid-cols-2 gap-3 mb-6">
-                <button id="tab-archery" onclick="setMenuMode('archery')" class="py-3 rounded-xl font-bold text-sm border border-emerald-400 bg-emerald-800/50 text-amber-300 transition">
-                    🎯 DESAFÍO DE TIRO
-                </button>
-                <button id="tab-tour" onclick="setMenuMode('tour')" class="py-3 rounded-xl font-bold text-sm border border-emerald-900 bg-emerald-950/50 text-emerald-400 transition hover:bg-emerald-900/40">
-                    🌿 MODO PASEO LIBRE
-                </button>
-            </div>
-
-            <div id="archery-panel" class="space-y-4">
-                <div class="text-left bg-emerald-950/60 p-3.5 rounded-xl border border-emerald-800/50">
-                    <label class="block text-xs font-bold text-emerald-300 mb-2 uppercase tracking-wider">Selecciona Dificultad:</label>
-                    <div class="grid grid-cols-3 gap-2">
-                        <button onclick="setDifficulty('normal')" id="diff-normal" class="diff-btn py-2 text-xs font-bold rounded-lg border border-amber-400/80 bg-amber-500/20 text-amber-300">
-                            NORMAL<br><span class="text-[10px] opacity-75 font-normal">Diana fija • Sin viento</span>
-                        </button>
-                        <button onclick="setDifficulty('dificil')" id="diff-dificil" class="diff-btn py-2 text-xs font-bold rounded-lg border border-emerald-800 bg-emerald-950/60 text-emerald-400 hover:border-emerald-500">
-                            DIFÍCIL<br><span class="text-[10px] opacity-75 font-normal">Movimiento • Viento suave</span>
-                        </button>
-                        <button onclick="setDifficulty('profesional')" id="diff-profesional" class="diff-btn py-2 text-xs font-bold rounded-lg border border-emerald-800 bg-emerald-950/60 text-emerald-400 hover:border-emerald-500">
-                            PROFESIONAL<br><span class="text-[10px] opacity-75 font-normal">Móvil lejano • Viento fuerte</span>
-                        </button>
-                    </div>
-                </div>
-
-                <button id="start-archery-btn" class="w-full py-4 rounded-xl text-base font-bold font-cinzel tracking-widest text-amber-300 green-button uppercase">
-                    INICIAR DESAFÍO DE ARQUERÍA
-                </button>
-            </div>
-
-            <div id="tour-panel" class="space-y-4 hidden">
-                <p class="text-xs text-gray-300 text-left bg-emerald-950/60 p-3 rounded-xl border border-emerald-800/50">
-                    Disfruta de una caminata relajante sin tiempo ni objetivos. Explora <strong>El Río</strong>, <strong>El Bosque Profundo</strong> y <strong>La Cima de la Montaña</strong>.
-                </p>
-                <button id="start-tour-btn" class="w-full py-4 rounded-xl text-base font-bold font-cinzel tracking-widest text-emerald-200 green-button uppercase">
-                    COMENZAR RECORRIDO LIBRE
-                </button>
-            </div>
-
-            <div id="vr-button-container" class="mt-4 w-full"></div>
-
-            <div class="mt-4 text-xs font-mono text-emerald-400/80">
-                MÁXIMO PUNTAJE: <span id="high-score-val">000</span>
-            </div>
-        </div>
+        <p class="text-xs text-emerald-400/70">Si el juego no gira al mover el teléfono, asegúrate de haber abierto la página con un servidor <b>http://localhost</b>.</p>
     </div>
 
     <script>
-        class SoundSystem {
-            constructor() { this.ctx = null; }
-
-            init() {
-                if (!this.ctx) {
-                    const AudioContext = window.AudioContext || window.webkitAudioContext;
-                    this.ctx = new AudioContext();
-                }
-                if (this.ctx.state === 'suspended') this.ctx.resume();
-            }
-
-            playBowDraw() {
-                if (!this.ctx) return;
-                const osc = this.ctx.createOscillator();
-                const gain = this.ctx.createGain();
-                osc.type = 'triangle';
-                osc.frequency.setValueAtTime(120, this.ctx.currentTime);
-                osc.frequency.exponentialRampToValueAtTime(260, this.ctx.currentTime + 0.3);
-                gain.gain.setValueAtTime(0.08, this.ctx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.3);
-                osc.connect(gain);
-                gain.connect(this.ctx.destination);
-                osc.start();
-                osc.stop(this.ctx.currentTime + 0.3);
-            }
-
-            playBowRelease() {
-                if (!this.ctx) return;
-                const bufferSize = this.ctx.sampleRate * 0.15;
-                const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-                const data = buffer.getChannelData(0);
-                for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
-
-                const noise = this.ctx.createBufferSource();
-                noise.buffer = buffer;
-                const filter = this.ctx.createBiquadFilter();
-                filter.type = 'bandpass';
-                filter.frequency.setValueAtTime(1200, this.ctx.currentTime);
-                filter.frequency.exponentialRampToValueAtTime(300, this.ctx.currentTime + 0.15);
-                filter.Q.value = 3;
-
-                const gain = this.ctx.createGain();
-                gain.gain.setValueAtTime(0.3, this.ctx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.15);
-
-                noise.connect(filter);
-                filter.connect(gain);
-                gain.connect(this.ctx.destination);
-                noise.start();
-                noise.stop(this.ctx.currentTime + 0.15);
-            }
-
-            playArrowHit(score) {
-                if (!this.ctx) return;
-                const osc = this.ctx.createOscillator();
-                const gain = this.ctx.createGain();
-                osc.type = 'sine';
-                osc.frequency.setValueAtTime(220, this.ctx.currentTime);
-                osc.frequency.exponentialRampToValueAtTime(60, this.ctx.currentTime + 0.1);
-                gain.gain.setValueAtTime(0.4, this.ctx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.1);
-                osc.connect(gain);
-                gain.connect(this.ctx.destination);
-                osc.start();
-                osc.stop(this.ctx.currentTime + 0.1);
-
-                if (score >= 75) {
-                    setTimeout(() => {
-                        const chime = this.ctx.createOscillator();
-                        const chimeGain = this.ctx.createGain();
-                        chime.type = 'sine';
-                        chime.frequency.setValueAtTime(score === 100 ? 880 : 660, this.ctx.currentTime);
-                        chimeGain.gain.setValueAtTime(0.2, this.ctx.currentTime);
-                        chimeGain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.25);
-                        chime.connect(chimeGain);
-                        chimeGain.connect(this.ctx.destination);
-                        chime.start();
-                        chime.stop(this.ctx.currentTime + 0.25);
-                    }, 80);
-                }
-            }
-        }
-
-        const sound = new SoundSystem();
-
-        function createBarkTexture() {
-            const canvas = document.createElement('canvas');
-            canvas.width = 512; canvas.height = 512;
-            const ctx = canvas.getContext('2d');
-            ctx.fillStyle = '#2d1810'; ctx.fillRect(0, 0, 512, 512);
-            for (let i = 0; i < 3000; i++) {
-                const x = Math.random() * 512, y = Math.random() * 512, h = 20 + Math.random() * 60;
-                ctx.fillStyle = Math.random() > 0.5 ? '#1a0d08' : '#3d2317';
-                ctx.fillRect(x, y, 2 + Math.random() * 2, h);
-            }
-            const texture = new THREE.CanvasTexture(canvas);
-            texture.wrapS = THREE.RepeatWrapping; texture.wrapT = THREE.RepeatWrapping;
-            texture.repeat.set(1, 3);
-            return texture;
-        }
-
-        function createGrassTexture() {
-            const canvas = document.createElement('canvas');
-            canvas.width = 512; canvas.height = 512;
-            const ctx = canvas.getContext('2d');
-            ctx.fillStyle = '#1e3a1e'; ctx.fillRect(0, 0, 512, 512);
-            for (let i = 0; i < 8000; i++) {
-                const x = Math.random() * 512, y = Math.random() * 512;
-                ctx.fillStyle = Math.random() > 0.4 ? '#14532d' : (Math.random() > 0.5 ? '#15803d' : '#0f291e');
-                ctx.fillRect(x, y, 2, 4);
-            }
-            const texture = new THREE.CanvasTexture(canvas);
-            texture.wrapS = THREE.RepeatWrapping; texture.wrapT = THREE.RepeatWrapping;
-            texture.repeat.set(16, 16);
-            return texture;
-        }
-
-        function createWoodGrainTexture() {
-            const canvas = document.createElement('canvas');
-            canvas.width = 512; canvas.height = 512;
-            const ctx = canvas.getContext('2d');
-            ctx.fillStyle = '#854d0e'; ctx.fillRect(0, 0, 512, 512);
-            ctx.strokeStyle = '#713f12'; ctx.lineWidth = 3;
-            for (let i = 0; i < 40; i++) {
-                ctx.beginPath();
-                ctx.arc(256, 256, i * 12 + Math.random() * 4, 0, Math.PI * 2);
-                ctx.stroke();
-            }
-            return new THREE.CanvasTexture(canvas);
-        }
-
-        function createWaterNormalMap() {
-            const canvas = document.createElement('canvas');
-            canvas.width = 256; canvas.height = 256;
-            const ctx = canvas.getContext('2d');
-            ctx.fillStyle = '#8080ff'; ctx.fillRect(0, 0, 256, 256);
-            for (let i = 0; i < 1500; i++) {
-                const x = Math.random() * 256, y = Math.random() * 256, r = 5 + Math.random() * 15;
-                const grad = ctx.createRadialGradient(x, y, 0, x, y, r);
-                grad.addColorStop(0, '#a0a0ff'); grad.addColorStop(1, '#8080ff');
-                ctx.fillStyle = grad;
-                ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
-            }
-            const texture = new THREE.CanvasTexture(canvas);
-            texture.wrapS = THREE.RepeatWrapping; texture.wrapT = THREE.RepeatWrapping;
-            texture.repeat.set(8, 8);
-            return texture;
-        }
-
         let scene, camera, renderer;
-        let playerGroup, cameraHolder;
-        let vrControllers = [];
-        let bowMesh = null, arrowMesh = null, bowStringMesh = null;
-        let activeArrows = [];
-        let targetGroup = null;
-        let environmentObjects = [];
-        let waterPlane = null, waterNormalMap = null;
-        let particleSystem = null;
-        let walkTime = 0;
+        let bowGroup, arrowMesh, targetGroup;
+        let isVR = false;
+        let alpha = 0, beta = 0, gamma = 0;
 
-        let barkMaterial, grassMaterial, woodMaterial, leafMaterial;
-
-        let gameMode = 'archery';
-        let difficulty = 'normal';
-        let currentTourLocation = 'rio';
-
-        // Estado de mandos Gamepad Bluetooth
-        let gamepadPressedState = false;
-
-        // Sistema de Colisión y Terreno
-        let playerRadius = 0.6;
-        let raycasterTerrain = new THREE.Raycaster();
-        let raycasterObstacle = new THREE.Raycaster();
-
-        let archeryState = {
-            active: false,
-            score: 0,
-            highScore: localStorage.getItem('vr_archery_hi') || 0,
-            arrowsLeft: 10,
-            isDrawingBow: false,
-            drawTension: 0,
-            wind: { x: 0, z: 0, speed: 0 },
-            targetPos: new THREE.Vector3(0, 2.2, -20),
-            targetDir: 1,
-            targetSpeed: 0
-        };
-
-        const keys = { w: false, a: false, s: false, d: false };
-        let moveTouchDir = { x: 0, y: 0 };
-        let isPointerLocked = false;
-        let eulerLook = new THREE.Euler(0, 0, 0, 'YXZ');
-
-        function initEngine() {
+        function init() {
             const container = document.getElementById('canvas-container');
 
             scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x0a1c12);
-            scene.fog = new THREE.FogExp2(0x0a1c12, 0.012);
+            scene.background = new THREE.Color(0x0f291e);
+            scene.fog = new THREE.FogExp2(0x0f291e, 0.015);
 
-            camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 1000);
-            
-            playerGroup = new THREE.Group();
-            cameraHolder = new THREE.Group();
-            cameraHolder.position.set(0, 1.65, 0);
-            
-            cameraHolder.add(camera);
-            playerGroup.add(cameraHolder);
-            scene.add(playerGroup);
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 1.6, 0);
 
-            renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+            renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-            renderer.shadowMap.enabled = true;
-            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-            renderer.toneMapping = THREE.ACESFilmicToneMapping;
-            renderer.toneMappingExposure = 1.1;
-            renderer.xr.enabled = true;
             container.appendChild(renderer.domElement);
 
-            const hemiLight = new THREE.HemisphereLight(0xb1e5fb, 0x14532d, 0.7);
-            scene.add(hemiLight);
+            // Luces
+            const light = new THREE.DirectionalLight(0xffffff, 1.2);
+            light.position.set(10, 20, 10);
+            scene.add(light);
+            scene.add(new THREE.AmbientLight(0x404040, 0.8));
 
-            const sunLight = new THREE.DirectionalLight(0xfffaed, 1.6);
-            sunLight.position.set(30, 50, 20);
-            sunLight.castShadow = true;
-            sunLight.shadow.mapSize.width = 2048;
-            sunLight.shadow.mapSize.height = 2048;
-            scene.add(sunLight);
+            // Suelo
+            const groundGeo = new THREE.PlaneGeometry(100, 100);
+            const groundMat = new THREE.MeshStandardMaterial({ color: 0x15803d });
+            const ground = new THREE.Mesh(groundGeo, groundMat);
+            ground.rotation.x = -Math.PI / 2;
+            scene.add(ground);
 
-            const barkTex = createBarkTexture();
-            barkMaterial = new THREE.MeshStandardMaterial({ map: barkTex, roughness: 0.85, metalness: 0.05, bumpMap: barkTex, bumpScale: 0.08 });
+            buildBow();
+            buildTarget();
 
-            const grassTex = createGrassTexture();
-            grassMaterial = new THREE.MeshStandardMaterial({ map: grassTex, roughness: 0.9, metalness: 0.02 });
+            // Capturar giroscopio nativo del móvil
+            window.addEventListener('deviceorientation', handleOrientation);
+            window.addEventListener('resize', onResize);
 
-            const woodTex = createWoodGrainTexture();
-            woodMaterial = new THREE.MeshStandardMaterial({ map: woodTex, roughness: 0.4, metalness: 0.1 });
+            document.getElementById('start-btn').addEventListener('click', startVR);
 
-            leafMaterial = new THREE.MeshStandardMaterial({ color: 0x15803d, roughness: 0.6, metalness: 0.05 });
-
-            waterNormalMap = createWaterNormalMap();
-
-            buildEnvironment('rio');
-            createBowAndArrow();
-            createTarget();
-            setupVRControllers();
-            createAtmosphericParticles();
-
-            window.addEventListener('resize', onWindowResize);
-            setupDesktopControls();
-            setupMobileControls();
-            setupVRButton();
-
-            renderer.setAnimationLoop(gameLoop);
+            renderer.setAnimationLoop(animate);
         }
 
-        function createBowAndArrow() {
-            const bowGroup = new THREE.Group();
+        function buildBow() {
+            bowGroup = new THREE.Group();
+            const bowGeo = new THREE.TorusGeometry(0.4, 0.015, 8, 24, Math.PI);
+            const bowMat = new THREE.MeshStandardMaterial({ color: 0x78350f });
+            const bowMesh = new THREE.Mesh(bowGeo, bowMat);
+            bowMesh.rotation.z = -Math.PI / 2;
+            bowGroup.add(bowMesh);
 
-            const curve = new THREE.CatmullRomCurve3([
-                new THREE.Vector3(0, -0.68, -0.08),
-                new THREE.Vector3(0, -0.42, 0.08),
-                new THREE.Vector3(0, -0.15, 0.14),
-                new THREE.Vector3(0, 0, 0.16),
-                new THREE.Vector3(0, 0.15, 0.14),
-                new THREE.Vector3(0, 0.42, 0.08),
-                new THREE.Vector3(0, 0.68, -0.08)
-            ]);
+            const arrowGeo = new THREE.CylinderGeometry(0.008, 0.008, 0.7);
+            arrowGeo.rotateX(Math.PI / 2);
+            const arrowMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b });
+            arrowMesh = new THREE.Mesh(arrowGeo, arrowMat);
+            arrowMesh.position.z = -0.2;
+            bowGroup.add(arrowMesh);
 
-            const bowGeo = new THREE.TubeGeometry(curve, 64, 0.022, 16, false);
-            const bowLimb = new THREE.Mesh(bowGeo, woodMaterial);
-            bowLimb.castShadow = true;
-            bowGroup.add(bowLimb);
-
-            const gripGeo = new THREE.CylinderGeometry(0.026, 0.026, 0.22, 16);
-            const gripMat = new THREE.MeshStandardMaterial({ color: 0x27272a, roughness: 0.7 });
-            const grip = new THREE.Mesh(gripGeo, gripMat);
-            grip.castShadow = true;
-            bowGroup.add(grip);
-
-            const stringGeo = new THREE.BufferGeometry().setFromPoints([
-                new THREE.Vector3(0, -0.67, -0.07),
-                new THREE.Vector3(0, 0, 0.16),
-                new THREE.Vector3(0, 0.67, -0.07)
-            ]);
-            const stringMat = new THREE.LineBasicMaterial({ color: 0xfef08a, linewidth: 2 });
-            bowStringMesh = new THREE.Line(stringGeo, stringMat);
-            bowGroup.add(bowStringMesh);
-
-            const arrowGroup = new THREE.Group();
-            const shaftGeo = new THREE.CylinderGeometry(0.007, 0.007, 0.8, 16);
-            shaftGeo.rotateX(Math.PI / 2);
-            const shaft = new THREE.Mesh(shaftGeo, woodMaterial);
-            shaft.castShadow = true;
-            arrowGroup.add(shaft);
-
-            const tipGeo = new THREE.ConeGeometry(0.014, 0.08, 16);
-            tipGeo.rotateX(-Math.PI / 2);
-            const tipMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.95, roughness: 0.15 });
-            const tip = new THREE.Mesh(tipGeo, tipMat);
-            tip.position.z = -0.42;
-            arrowGroup.add(tip);
-
-            bowGroup.add(arrowGroup);
-            arrowMesh = arrowGroup;
-            bowMesh = bowGroup;
-
-            bowMesh.position.set(0.22, -0.22, -0.48);
-            bowMesh.rotation.y = -Math.PI / 14;
-            cameraHolder.add(bowMesh);
+            bowGroup.position.set(0.15, -0.2, -0.5);
+            camera.add(bowGroup);
+            scene.add(camera);
         }
 
-        function createTarget() {
+        function buildTarget() {
             targetGroup = new THREE.Group();
-
-            const legGeo = new THREE.CylinderGeometry(0.035, 0.035, 2.3, 16);
-            const leg1 = new THREE.Mesh(legGeo, woodMaterial);
-            leg1.rotation.z = 0.22; leg1.position.set(-0.45, 0.95, 0);
-            const leg2 = new THREE.Mesh(legGeo, woodMaterial);
-            leg2.rotation.z = -0.22; leg2.position.set(0.45, 0.95, 0);
-            const leg3 = new THREE.Mesh(legGeo, woodMaterial);
-            leg3.rotation.x = -0.3; leg3.position.set(0, 0.95, -0.35);
-
-            targetGroup.add(leg1); targetGroup.add(leg2); targetGroup.add(leg3);
-
-            const diskGeo = new THREE.CylinderGeometry(0.85, 0.85, 0.12, 64);
-            diskGeo.rotateX(Math.PI / 2);
-
-            const canvas = document.createElement('canvas');
-            canvas.width = 1024; canvas.height = 1024;
-            const ctx = canvas.getContext('2d');
-
-            const rings = [
-                { r: 500, color: '#f8fafc' }, { r: 400, color: '#0f172a' },
-                { r: 300, color: '#2563eb' }, { r: 200, color: '#dc2626' },
-                { r: 100, color: '#eab308' }, { r: 30,  color: '#ca8a04' }
-            ];
-
-            rings.forEach(ring => {
-                ctx.beginPath(); ctx.arc(512, 512, ring.r, 0, Math.PI * 2);
-                ctx.fillStyle = ring.color; ctx.fill();
-            });
-
-            const targetTex = new THREE.CanvasTexture(canvas);
-            const targetMat = new THREE.MeshStandardMaterial({ map: targetTex, roughness: 0.3 });
-            const disk = new THREE.Mesh(diskGeo, targetMat);
-            disk.position.set(0, 1.5, 0);
-            targetGroup.add(disk);
-
-            targetGroup.position.copy(archeryState.targetPos);
+            const targetGeo = new THREE.CylinderGeometry(0.8, 0.8, 0.1, 32);
+            targetGeo.rotateX(Math.PI / 2);
+            const targetMat = new THREE.MeshStandardMaterial({ color: 0xdc2626 });
+            const targetDisk = new THREE.Mesh(targetGeo, targetMat);
+            
+            targetGroup.add(targetDisk);
+            targetGroup.position.set(0, 1.6, -12);
             scene.add(targetGroup);
         }
 
-        function createAtmosphericParticles() {
-            const count = 300;
-            const geo = new THREE.BufferGeometry();
-            const positions = new Float32Array(count * 3);
-            for (let i = 0; i < count * 3; i += 3) {
-                positions[i] = (Math.random() - 0.5) * 60;
-                positions[i + 1] = 0.5 + Math.random() * 12;
-                positions[i + 2] = (Math.random() - 0.5) * 60;
-            }
-            geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-            particleSystem = new THREE.Points(geo, new THREE.PointsMaterial({ color: 0xfef08a, size: 0.08, transparent: true, opacity: 0.7 }));
-            scene.add(particleSystem);
-        }
+        function handleOrientation(event) {
+            // Recibir datos del giroscopio del Redmi
+            if (event.beta !== null) {
+                beta = THREE.MathUtils.degToRad(event.beta);
+                gamma = THREE.MathUtils.degToRad(event.gamma);
+                alpha = THREE.MathUtils.degToRad(event.alpha || 0);
 
-        function clearEnvironment() {
-            environmentObjects.forEach(obj => scene.remove(obj));
-            environmentObjects = [];
-            if (waterPlane) { scene.remove(waterPlane); waterPlane = null; }
-        }
-
-        function createRiverRocks() {
-            const rockMaterial = new THREE.MeshStandardMaterial({ 
-                color: 0x475569, 
-                roughness: 0.8, 
-                metalness: 0.2, 
-                flatShading: true 
-            });
-
-            for (let z = -60; z <= 60; z += 3.5) {
-                const banks = [3.5 + (Math.random() - 0.5) * 1.5, 16.5 + (Math.random() - 0.5) * 1.5];
-
-                banks.forEach(xPos => {
-                    if (Math.random() > 0.25) {
-                        const scale = 0.4 + Math.random() * 0.8;
-                        const rockGeo = new THREE.DodecahedronGeometry(scale, 1);
-                        
-                        const posAttr = rockGeo.attributes.position;
-                        for (let i = 0; i < posAttr.count; i++) {
-                            posAttr.setX(i, posAttr.getX(i) + (Math.random() - 0.5) * 0.2);
-                            posAttr.setY(i, posAttr.getY(i) + (Math.random() - 0.5) * 0.2);
-                            posAttr.setZ(i, posAttr.getZ(i) + (Math.random() - 0.5) * 0.2);
-                        }
-                        rockGeo.computeVertexNormals();
-
-                        const rock = new THREE.Mesh(rockGeo, rockMaterial);
-                        rock.position.set(xPos, -0.2 + scale * 0.3, z);
-                        rock.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, 0);
-                        rock.castShadow = true;
-                        rock.receiveShadow = true;
-                        rock.isObstacle = true;
-                        
-                        scene.add(rock);
-                        environmentObjects.push(rock);
-                    }
-                });
+                // Aplicar rotación a la cámara
+                camera.rotation.set(beta - Math.PI / 2, gamma, alpha, 'YXZ');
             }
         }
 
-        function createDetailedTreesAround(count, minRadius) {
-            let created = 0;
-            let attempts = 0;
+        function startVR() {
+            isVR = true;
+            document.getElementById('overlay').classList.add('hidden');
+            document.getElementById('reticle-l').style.display = 'block';
+            document.getElementById('reticle-r').style.display = 'block';
 
-            while (created < count && attempts < count * 3) {
-                attempts++;
-                const angle = Math.random() * Math.PI * 2;
-                const radius = minRadius + Math.random() * 40;
-                const x = Math.cos(angle) * radius;
-                const z = Math.sin(angle) * radius;
-
-                if (currentTourLocation === 'rio' && Math.abs(x - 10) < 8) {
-                    continue;
-                }
-
-                const treeGroup = new THREE.Group();
-                const trunkGeo = new THREE.CylinderGeometry(0.25, 0.5, 6, 20);
-                const trunk = new THREE.Mesh(trunkGeo, barkMaterial);
-                trunk.position.y = 3;
-                trunk.castShadow = true;
-                treeGroup.add(trunk);
-
-                const foliageClusters = 4 + Math.floor(Math.random() * 3);
-                for (let j = 0; j < foliageClusters; j++) {
-                    const folGeo = new THREE.IcosahedronGeometry(1.8 + Math.random() * 0.8, 3);
-                    const foliage = new THREE.Mesh(folGeo, leafMaterial);
-                    foliage.position.set((Math.random() - 0.5) * 1.5, 5.5 + j * 1.2, (Math.random() - 0.5) * 1.5);
-                    foliage.castShadow = true;
-                    treeGroup.add(foliage);
-                }
-
-                treeGroup.position.set(x, 0, z);
-                treeGroup.isObstacle = true;
-                scene.add(treeGroup);
-                environmentObjects.push(treeGroup);
-                created++;
+            // Activar pantalla completa si es posible
+            if (document.documentElement.requestFullscreen) {
+                document.documentElement.requestFullscreen();
             }
         }
 
-        function buildEnvironment(locationType) {
-            clearEnvironment();
-            currentTourLocation = locationType;
+        function animate() {
+            if (isVR) {
+                const width = window.innerWidth;
+                const height = window.innerHeight;
 
-            if (locationType === 'rio') {
-                scene.background = new THREE.Color(0x0f291e);
-                scene.fog = new THREE.FogExp2(0x0f291e, 0.012);
+                // Renderizar Ojo Izquierdo
+                renderer.setViewport(0, 0, width / 2, height);
+                renderer.setScissor(0, 0, width / 2, height);
+                renderer.setScissorTest(true);
+                camera.aspect = (width / 2) / height;
+                camera.updateProjectionMatrix();
+                renderer.render(scene, camera);
 
-                const waterGeo = new THREE.PlaneGeometry(13, 140, 32, 32);
-                const waterMat = new THREE.MeshStandardMaterial({
-                    color: 0x0284c7,
-                    roughness: 0.1,
-                    metalness: 0.8,
-                    normalMap: waterNormalMap,
-                    normalScale: new THREE.Vector2(0.2, 0.2),
-                    transparent: true,
-                    opacity: 0.75
-                });
-                waterPlane = new THREE.Mesh(waterGeo, waterMat);
-                waterPlane.rotation.x = -Math.PI / 2;
-                waterPlane.position.set(10, -0.1, 0);
-                scene.add(waterPlane);
-
-                const terrainGeo = new THREE.PlaneGeometry(140, 140, 120, 120);
-                terrainGeo.rotateX(-Math.PI / 2);
-                const posAttr = terrainGeo.attributes.position;
-
-                for (let i = 0; i < posAttr.count; i++) {
-                    const x = posAttr.getX(i);
-                    const z = posAttr.getZ(i);
-
-                    let h = Math.sin(x * 0.05) * Math.cos(z * 0.05) * 1.5;
-                    const distToRiver = Math.abs(x - 10);
-                    if (distToRiver < 6.5) {
-                        const depthFactor = Math.cos((distToRiver / 6.5) * (Math.PI / 2));
-                        h -= depthFactor * 2.2;
-                    }
-                    posAttr.setY(i, h);
-                }
-                terrainGeo.computeVertexNormals();
-
-                const terrain = new THREE.Mesh(terrainGeo, grassMaterial);
-                terrain.receiveShadow = true;
-                terrain.isMesh = true;
-                scene.add(terrain);
-                environmentObjects.push(terrain);
-
-                createRiverRocks();
-                createDetailedTreesAround(50, 14);
-
-            } else if (locationType === 'bosque') {
-                scene.background = new THREE.Color(0x0a1c12);
-                scene.fog = new THREE.FogExp2(0x0a1c12, 0.016);
-
-                const terrainGeo = new THREE.PlaneGeometry(140, 140, 80, 80);
-                terrainGeo.rotateX(-Math.PI / 2);
-                const posAttr = terrainGeo.attributes.position;
-                for (let i = 0; i < posAttr.count; i++) {
-                    const x = posAttr.getX(i), z = posAttr.getZ(i);
-                    posAttr.setY(i, Math.sin(x * 0.08) * 1.2 + Math.cos(z * 0.08) * 1.2);
-                }
-                terrainGeo.computeVertexNormals();
-
-                const terrain = new THREE.Mesh(terrainGeo, grassMaterial);
-                terrain.receiveShadow = true;
-                terrain.isMesh = true;
-                scene.add(terrain);
-                environmentObjects.push(terrain);
-                createDetailedTreesAround(85, 5);
-
-            } else if (locationType === 'montana') {
-                scene.background = new THREE.Color(0x050b14);
-                scene.fog = new THREE.FogExp2(0x050b14, 0.006);
-
-                const peakGeo = new THREE.CylinderGeometry(0.5, 55, 38, 64, 32);
-                const posAttr = peakGeo.attributes.position;
-                for (let i = 0; i < posAttr.count; i++) {
-                    const y = posAttr.getY(i);
-                    if (y < 18) {
-                        const x = posAttr.getX(i), z = posAttr.getZ(i);
-                        const noise = Math.sin(x * 0.35) * Math.cos(z * 0.35) * 3 + Math.sin(x * 0.1) * 2.5;
-                        posAttr.setX(i, x + (x / 55) * noise);
-                        posAttr.setZ(i, z + (z / 55) * noise);
-                    }
-                }
-                peakGeo.computeVertexNormals();
-                const peakMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.9, metalness: 0.1, flatShading: true });
-                const peak = new THREE.Mesh(peakGeo, peakMat);
-                peak.position.set(0, -14, -15);
-                peak.receiveShadow = true;
-                peak.isMesh = true;
-                scene.add(peak);
-                environmentObjects.push(peak);
-
-                const starsGeo = new THREE.BufferGeometry();
-                const starsCount = 1200;
-                const starsArray = new Float32Array(starsCount * 3);
-                for (let i = 0; i < starsCount * 3; i += 3) {
-                    starsArray[i] = (Math.random() - 0.5) * 300;
-                    starsArray[i + 1] = 10 + Math.random() * 150;
-                    starsArray[i + 2] = (Math.random() - 0.5) * 300;
-                }
-                starsGeo.setAttribute('position', new THREE.BufferAttribute(starsArray, 3));
-                const starsMat = new THREE.PointsMaterial({ color: 0xffffff, size: 0.8, transparent: true, opacity: 0.85 });
-                const stars = new THREE.Points(starsGeo, starsMat);
-                scene.add(stars);
-                environmentObjects.push(stars);
-
-                const moonGeo = new THREE.SphereGeometry(5, 32, 32);
-                const moonMat = new THREE.MeshBasicMaterial({ color: 0xfffaed });
-                const moon = new THREE.Mesh(moonGeo, moonMat);
-                moon.position.set(35, 45, -60);
-                scene.add(moon);
-                environmentObjects.push(moon);
-
-                const poleGeo = new THREE.CylinderGeometry(0.08, 0.1, 7, 12);
-                const poleMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.85, roughness: 0.2 });
-                const pole = new THREE.Mesh(poleGeo, poleMat);
-                pole.position.set(0, 7.5, -12);
-                pole.castShadow = true;
-                pole.isObstacle = true;
-                scene.add(pole);
-                environmentObjects.push(pole);
-
-                const flagGeo = new THREE.PlaneGeometry(3, 1.8, 16, 12);
-                const posFlagAttr = flagGeo.attributes.position;
-                for (let i = 0; i < posFlagAttr.count; i++) {
-                    const x = posFlagAttr.getX(i);
-                    posFlagAttr.setZ(i, Math.sin(x * 2.2) * 0.18);
-                }
-                flagGeo.computeVertexNormals();
-                const flagMat = new THREE.MeshStandardMaterial({ color: 0xdc2626, side: THREE.DoubleSide, roughness: 0.4 });
-                const flag = new THREE.Mesh(flagGeo, flagMat);
-                flag.position.set(1.5, 9.8, -12);
-                flag.castShadow = true;
-                scene.add(flag);
-                environmentObjects.push(flag);
-            }
-        }
-
-        function setupVRControllers() {
-            for (let i = 0; i < 2; i++) {
-                const controller = renderer.xr.getController(i);
-                controller.addEventListener('selectstart', () => { if (gameMode === 'archery' && archeryState.active) startBowDraw(); });
-                controller.addEventListener('selectend', () => { if (gameMode === 'archery' && archeryState.active) releaseArrow(); });
-                playerGroup.add(controller);
-                vrControllers.push(controller);
-            }
-        }
-
-        function startBowDraw() {
-            if (archeryState.arrowsLeft <= 0) return;
-            archeryState.isDrawingBow = true;
-            sound.playBowDraw();
-        }
-
-        function releaseArrow() {
-            if (!archeryState.isDrawingBow || archeryState.arrowsLeft <= 0) return;
-
-            archeryState.isDrawingBow = false;
-            sound.playBowRelease();
-            archeryState.arrowsLeft--;
-
-            const origin = new THREE.Vector3();
-            const direction = new THREE.Vector3();
-
-            if (renderer.xr.isPresenting && vrControllers[0] && vrControllers[0].visible) {
-                vrControllers[0].getWorldPosition(origin);
-                vrControllers[0].getWorldDirection(direction);
-                direction.negate();
+                // Renderizar Ojo Derecho
+                renderer.setViewport(width / 2, 0, width / 2, height);
+                renderer.setScissor(width / 2, 0, width / 2, height);
+                renderer.setScissorTest(true);
+                renderer.render(scene, camera);
             } else {
-                camera.getWorldPosition(origin);
-                camera.getWorldDirection(direction);
-            }
-
-            const speed = 15 + archeryState.drawTension * 18;
-
-            const arrowFlight = arrowMesh.clone();
-            arrowFlight.position.copy(origin);
-            scene.add(arrowFlight);
-
-            activeArrows.push({
-                mesh: arrowFlight,
-                pos: origin.clone(),
-                vel: direction.multiplyScalar(speed),
-                active: true,
-                life: 180
-            });
-
-            archeryState.drawTension = 0;
-            updateUI();
-
-            if (archeryState.arrowsLeft <= 0) {
-                setTimeout(endArcheryRound, 3000);
+                renderer.setViewport(0, 0, window.innerWidth, window.innerHeight);
+                renderer.setScissorTest(false);
+                renderer.render(scene, camera);
             }
         }
 
-        function updateArrows() {
-            const dt = 0.016;
-            const gravity = new THREE.Vector3(0, -9.81, 0);
-            const windForce = new THREE.Vector3(archeryState.wind.x, 0, archeryState.wind.z);
-
-            for (let i = activeArrows.length - 1; i >= 0; i--) {
-                const arrow = activeArrows[i];
-                if (!arrow.active) continue;
-
-                arrow.vel.addScaledVector(gravity, dt);
-                arrow.vel.addScaledVector(windForce, dt * 0.15);
-                arrow.pos.addScaledVector(arrow.vel, dt);
-
-                arrow.mesh.position.copy(arrow.pos);
-
-                const nextPos = arrow.pos.clone().add(arrow.vel);
-                arrow.mesh.lookAt(nextPos);
-
-                const distToTarget = arrow.pos.distanceTo(targetGroup.position.clone().add(new THREE.Vector3(0, 1.5, 0)));
-                if (distToTarget < 0.88 && Math.abs(arrow.pos.z - targetGroup.position.z) < 0.4) {
-                    arrow.active = false;
-                    
-                    const hitDist = new THREE.Vector2(arrow.pos.x - targetGroup.position.x, arrow.pos.y - (targetGroup.position.y + 1.5)).length();
-                    let hitScore = 0;
-
-                    if (hitDist < 0.12) hitScore = 100;
-                    else if (hitDist < 0.3) hitScore = 75;
-                    else if (hitDist < 0.5) hitScore = 50;
-                    else if (hitDist < 0.7) hitScore = 25;
-
-                    archeryState.score += hitScore;
-                    sound.playArrowHit(hitScore);
-                    updateUI();
-                }
-
-                if (arrow.pos.y <= -2.0) arrow.active = false;
-
-                arrow.life--;
-                if (arrow.life <= 0) {
-                    scene.remove(arrow.mesh);
-                    activeArrows.splice(i, 1);
-                }
-            }
-        }
-
-        function setDifficulty(diff) {
-            difficulty = diff;
-            document.querySelectorAll('.diff-btn').forEach(btn => {
-                btn.className = 'diff-btn py-2 text-xs font-bold rounded-lg border border-emerald-800 bg-emerald-950/60 text-emerald-400 hover:border-emerald-500';
-            });
-
-            const activeBtn = document.getElementById(`diff-${diff}`);
-            if (activeBtn) {
-                activeBtn.className = 'diff-btn py-2 text-xs font-bold rounded-lg border border-amber-400/80 bg-amber-500/20 text-amber-300';
-            }
-
-            if (diff === 'normal') {
-                archeryState.targetPos.set(0, 2.2, -20);
-                archeryState.targetSpeed = 0;
-                archeryState.wind = { x: 0, z: 0, speed: 0 };
-            } else if (diff === 'dificil') {
-                archeryState.targetPos.set(0, 2.5, -28);
-                archeryState.targetSpeed = 0.04;
-                archeryState.wind = { x: (Math.random() - 0.5) * 8, z: 0, speed: Math.floor(Math.random() * 15 + 5) };
-            } else if (diff === 'profesional') {
-                archeryState.targetPos.set(0, 2.8, -35);
-                archeryState.targetSpeed = 0.08;
-                archeryState.wind = { x: (Math.random() - 0.5) * 18, z: 0, speed: Math.floor(Math.random() * 30 + 15) };
-            }
-
-            if (targetGroup) targetGroup.position.copy(archeryState.targetPos);
-            updateUI();
-        }
-
-        function setMenuMode(mode) {
-            gameMode = mode;
-            const archeryTab = document.getElementById('tab-archery');
-            const tourTab = document.getElementById('tab-tour');
-            const archeryPanel = document.getElementById('archery-panel');
-            const tourPanel = document.getElementById('tour-panel');
-
-            if (mode === 'archery') {
-                archeryTab.className = 'py-3 rounded-xl font-bold text-sm border border-emerald-400 bg-emerald-800/50 text-amber-300 transition';
-                tourTab.className = 'py-3 rounded-xl font-bold text-sm border border-emerald-900 bg-emerald-950/50 text-emerald-400 transition hover:bg-emerald-900/40';
-                archeryPanel.classList.remove('hidden');
-                tourPanel.classList.add('hidden');
-            } else {
-                tourTab.className = 'py-3 rounded-xl font-bold text-sm border border-emerald-400 bg-emerald-800/50 text-amber-300 transition';
-                archeryTab.className = 'py-3 rounded-xl font-bold text-sm border border-emerald-900 bg-emerald-950/50 text-emerald-400 transition hover:bg-emerald-900/40';
-                tourPanel.classList.remove('hidden');
-                archeryPanel.classList.add('hidden');
-            }
-        }
-
-        function switchTourLocation(location) {
-            buildEnvironment(location);
-            const titleEl = document.getElementById('tour-location-title');
-            const descEl = document.getElementById('tour-location-desc');
-
-            if (location === 'rio') {
-                titleEl.textContent = 'EL RÍO FRONDOSO';
-                descEl.textContent = 'Explora las orillas cristalinas rodeadas de flora silvestre y piedras centenarias.';
-            } else if (location === 'bosque') {
-                titleEl.textContent = 'EL BOSQUE PROFUNDO';
-                descEl.textContent = 'Sumérgete en la espesura del bosque bajo un follaje espeso y senderos de pino.';
-            } else if (location === 'montana') {
-                titleEl.textContent = 'LA CIMA DE LA MONTAÑA';
-                descEl.textContent = 'Disfruta de la brisa alpina bajo la luna y las estrellas junto a la gran bandera.';
-            }
-        }
-
-        function startArcheryGame() {
-            sound.init();
-            gameMode = 'archery';
-            archeryState.active = true;
-            archeryState.score = 0;
-            archeryState.arrowsLeft = 10;
-
-            buildEnvironment('bosque');
-            if (targetGroup) targetGroup.visible = true;
-            if (bowMesh) bowMesh.visible = true;
-
-            document.getElementById('menu-overlay').classList.add('hidden');
-            document.getElementById('hud-overlay').classList.remove('hidden');
-            document.getElementById('tour-hud-overlay').classList.add('hidden');
-
-            if ('ontouchstart' in window && window.innerWidth < 768 && !renderer.xr.isPresenting) {
-                document.getElementById('mobile-controls').classList.remove('hidden');
-            }
-
-            updateUI();
-        }
-
-        function startTourMode() {
-            sound.init();
-            gameMode = 'tour';
-            archeryState.active = false;
-
-            buildEnvironment('rio');
-            if (targetGroup) targetGroup.visible = false;
-            if (bowMesh) bowMesh.visible = false;
-
-            document.getElementById('menu-overlay').classList.add('hidden');
-            document.getElementById('hud-overlay').classList.add('hidden');
-            document.getElementById('tour-hud-overlay').classList.remove('hidden');
-
-            if ('ontouchstart' in window && window.innerWidth < 768 && !renderer.xr.isPresenting) {
-                document.getElementById('mobile-controls').classList.remove('hidden');
-            }
-        }
-
-        function endArcheryRound() {
-            archeryState.active = false;
-            if (archeryState.score > archeryState.highScore) {
-                archeryState.highScore = archeryState.score;
-                localStorage.setItem('vr_archery_hi', archeryState.highScore);
-            }
-
-            document.getElementById('high-score-val').textContent = String(archeryState.highScore).padStart(3, '0');
-            document.getElementById('hud-overlay').classList.add('hidden');
-            document.getElementById('menu-overlay').classList.remove('hidden');
-        }
-
-        function setupDesktopControls() {
-            window.addEventListener('keydown', (e) => {
-                if (e.key.toLowerCase() in keys) keys[e.key.toLowerCase()] = true;
-                if (e.key === 'Escape' && isPointerLocked) {
-                    document.exitPointerLock();
-                }
-            });
-
-            window.addEventListener('keyup', (e) => {
-                if (e.key.toLowerCase() in keys) keys[e.key.toLowerCase()] = false;
-            });
-
-            const canvas = renderer.domElement;
-            canvas.addEventListener('mousedown', (e) => {
-                if (!renderer.xr.isPresenting && e.button === 0) {
-                    if (!isPointerLocked) {
-                        canvas.requestPointerLock();
-                    } else if (gameMode === 'archery' && archeryState.active) {
-                        startBowDraw();
-                    }
-                }
-            });
-
-            canvas.addEventListener('mouseup', (e) => {
-                if (isPointerLocked && gameMode === 'archery' && archeryState.active && e.button === 0) {
-                    releaseArrow();
-                }
-            });
-
-            document.addEventListener('pointerlockchange', () => {
-                isPointerLocked = document.pointerLockElement === canvas;
-                document.getElementById('crosshair').style.display = isPointerLocked && gameMode === 'archery' ? 'block' : 'none';
-            });
-
-            document.addEventListener('mousemove', (e) => {
-                if (isPointerLocked) {
-                    eulerLook.y -= e.movementX * 0.0008;
-                    eulerLook.x -= e.movementY * 0.0008;
-                    eulerLook.x = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, eulerLook.x));
-                    camera.quaternion.setFromEuler(eulerLook);
-                }
-            });
-        }
-
-        function setupMobileControls() {
-            const moveArea = document.getElementById('touch-move-area');
-            const stick = document.getElementById('touch-move-stick');
-            const shootBtn = document.getElementById('mobile-shoot-btn');
-
-            let touchId = null;
-
-            moveArea.addEventListener('touchstart', (e) => { touchId = e.changedTouches[0].identifier; });
-            moveArea.addEventListener('touchmove', (e) => {
-                for (let touch of e.changedTouches) {
-                    if (touch.identifier === touchId) {
-                        const rect = moveArea.getBoundingClientRect();
-                        const dx = (touch.clientX - (rect.left + rect.width / 2)) / (rect.width / 2);
-                        const dy = (touch.clientY - (rect.top + rect.height / 2)) / (rect.height / 2);
-                        stick.style.transform = `translate(${dx * 25}px, ${dy * 25}px)`;
-                        moveTouchDir.x = dx; moveTouchDir.y = dy;
-                    }
-                }
-            });
-
-            const resetStick = () => {
-                stick.style.transform = `translate(0px, 0px)`;
-                moveTouchDir = { x: 0, y: 0 };
-            };
-
-            moveArea.addEventListener('touchend', resetStick);
-            shootBtn.addEventListener('touchstart', () => { if (gameMode === 'archery' && archeryState.active) startBowDraw(); });
-            shootBtn.addEventListener('touchend', () => { if (gameMode === 'archery' && archeryState.active) releaseArrow(); });
-
-            // Soporte de toque / disparo con el botón capacitivo de visores VR pasivos (Cardboard)
-            window.addEventListener('touchstart', (e) => {
-                if (renderer.xr.isPresenting && gameMode === 'archery' && archeryState.active) {
-                    startBowDraw();
-                }
-            });
-            window.addEventListener('touchend', (e) => {
-                if (renderer.xr.isPresenting && gameMode === 'archery' && archeryState.active) {
-                    releaseArrow();
-                }
-            });
-        }
-
-        function pollGamepadControls() {
-            const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
-            let isAnyButtonPressed = false;
-
-            for (let i = 0; i < gamepads.length; i++) {
-                const gp = gamepads[i];
-                if (!gp) continue;
-
-                // Ejes de joystick para movimiento (X: eje 0, Y: eje 1 o eje 3)
-                const axisX = Math.abs(gp.axes[0]) > 0.15 ? gp.axes[0] : (gp.axes[2] || 0);
-                const axisY = Math.abs(gp.axes[1]) > 0.15 ? gp.axes[1] : (gp.axes[3] || 0);
-
-                if (Math.abs(axisX) > 0.15 || Math.abs(axisY) > 0.15) {
-                    moveTouchDir.x = axisX;
-                    moveTouchDir.y = axisY;
-                }
-
-                // Detección de botones (A, X, Trigger o cualquier botón de acción del control Bluetooth)
-                for (let b = 0; b < gp.buttons.length; b++) {
-                    if (gp.buttons[b].pressed) {
-                        isAnyButtonPressed = true;
-                        break;
-                    }
-                }
-            }
-
-            if (isAnyButtonPressed && !gamepadPressedState) {
-                gamepadPressedState = true;
-                if (gameMode === 'archery' && archeryState.active) {
-                    startBowDraw();
-                }
-            } else if (!isAnyButtonPressed && gamepadPressedState) {
-                gamepadPressedState = false;
-                if (gameMode === 'archery' && archeryState.active) {
-                    releaseArrow();
-                }
-            }
-        }
-
-        function setupVRButton() {
-            const vrContainer = document.getElementById('vr-button-container');
-            if ('xr' in navigator) {
-                navigator.xr.isSessionSupported('immersive-vr').then((supported) => {
-                    if (supported) {
-                        const btn = document.createElement('button');
-                        btn.className = "w-full py-3.5 rounded-xl text-xs font-bold font-cinzel tracking-widest text-amber-300 border border-emerald-500 bg-emerald-950/60 hover:bg-emerald-800/40 uppercase transition";
-                        btn.textContent = "🥽 MODALIDAD REALIDAD VIRTUAL (WEBXR)";
-                        btn.onclick = () => {
-                            sound.init();
-                            navigator.xr.requestSession('immersive-vr', { optionalFeatures: ['local-floor', 'bounded-floor'] })
-                                .then((session) => { 
-                                    renderer.xr.setSession(session); 
-                                    document.getElementById('mobile-controls').classList.add('hidden');
-                                });
-                        };
-                        vrContainer.appendChild(btn);
-                    }
-                });
-            }
-        }
-
-        function updatePlayerMovement() {
-            const speed = 0.08;
-            const dir = new THREE.Vector3();
-            let isMoving = false;
-
-            if (keys.w) { dir.z -= 1; isMoving = true; }
-            if (keys.s) { dir.z += 1; isMoving = true; }
-            if (keys.a) { dir.x -= 1; isMoving = true; }
-            if (keys.d) { dir.x += 1; isMoving = true; }
-
-            if (moveTouchDir.x !== 0 || moveTouchDir.y !== 0) {
-                dir.x = moveTouchDir.x;
-                dir.z = moveTouchDir.y;
-                isMoving = true;
-            }
-
-            if (isMoving) {
-                dir.normalize();
-                
-                // Aplicar dirección de rotación según la cámara o el headset VR
-                const rotation = new THREE.Quaternion();
-                if (renderer.xr.isPresenting) {
-                    camera.getWorldQuaternion(rotation);
-                } else {
-                    rotation.copy(camera.quaternion);
-                }
-
-                dir.applyQuaternion(rotation);
-                dir.y = 0;
-
-                const moveVector = dir.clone().multiplyScalar(speed);
-
-                raycasterObstacle.set(
-                    new THREE.Vector3(playerGroup.position.x, playerGroup.position.y + 1.0, playerGroup.position.z),
-                    dir.clone().normalize()
-                );
-
-                const obstacles = environmentObjects.filter(obj => obj.isObstacle);
-                const intersects = raycasterObstacle.intersectObjects(obstacles, true);
-
-                let canMove = true;
-                if (intersects.length > 0 && intersects[0].distance < playerRadius + speed) {
-                    canMove = false;
-                }
-
-                if (canMove) {
-                    playerGroup.position.add(moveVector);
-                }
-
-                walkTime += 0.14;
-            }
-
-            // Detección de suelo / relieve de montaña
-            const rayOrigin = new THREE.Vector3(playerGroup.position.x, 50, playerGroup.position.z);
-            const rayDir = new THREE.Vector3(0, -1, 0);
-            raycasterTerrain.set(rayOrigin, rayDir);
-
-            const terrainMeshes = environmentObjects.filter(obj => obj.isMesh);
-            const groundHits = raycasterTerrain.intersectObjects(terrainMeshes, true);
-
-            let targetGroundY = 0;
-            if (groundHits.length > 0) {
-                targetGroundY = groundHits[0].point.y;
-            }
-
-            playerGroup.position.y += (targetGroundY - playerGroup.position.y) * 0.2;
-
-            const baseCameraHeight = 1.65;
-            if (isMoving) {
-                cameraHolder.position.y = baseCameraHeight + Math.sin(walkTime) * 0.05;
-            } else {
-                cameraHolder.position.y += (baseCameraHeight - cameraHolder.position.y) * 0.1;
-            }
-        }
-
-        function gameLoop(time) {
-            pollGamepadControls();
-            updatePlayerMovement();
-
-            if (waterPlane && waterNormalMap) {
-                waterNormalMap.offset.x += 0.0008;
-                waterNormalMap.offset.y += 0.0012;
-            }
-
-            if (particleSystem) particleSystem.rotation.y += 0.0005;
-
-            if (archeryState.isDrawingBow && archeryState.drawTension < 1) {
-                archeryState.drawTension = Math.min(1, archeryState.drawTension + 0.025);
-                if (bowStringMesh) {
-                    const stringGeo = bowStringMesh.geometry;
-                    const pos = stringGeo.attributes.position;
-                    pos.setXYZ(1, 0, 0, 0.16 - archeryState.drawTension * 0.28);
-                    pos.needsUpdate = true;
-                }
-                updateUI();
-            } else if (!archeryState.isDrawingBow && bowStringMesh) {
-                const stringGeo = bowStringMesh.geometry;
-                const pos = stringGeo.attributes.position;
-                pos.setXYZ(1, 0, 0, 0.16);
-                pos.needsUpdate = true;
-            }
-
-            if (archeryState.active && archeryState.targetSpeed > 0 && targetGroup) {
-                targetGroup.position.x += archeryState.targetDir * archeryState.targetSpeed;
-                if (Math.abs(targetGroup.position.x) > 6) archeryState.targetDir *= -1;
-            }
-
-            updateArrows();
-            renderer.render(scene, camera);
-        }
-
-        function updateUI() {
-            document.getElementById('arrows-count').textContent = `${archeryState.arrowsLeft} / 10`;
-            document.getElementById('hud-diff').textContent = difficulty;
-            document.getElementById('score-display').textContent = String(archeryState.score).padStart(3, '0');
-
-            const windArrow = document.getElementById('wind-arrow');
-            const windAngle = Math.atan2(archeryState.wind.z, archeryState.wind.x) * (180 / Math.PI);
-            windArrow.style.transform = `rotate(${windAngle}deg)`;
-            document.getElementById('wind-speed').textContent = `${archeryState.wind.speed} km/h`;
-
-            const powerBar = document.getElementById('power-bar');
-            powerBar.style.width = `${archeryState.drawTension * 100}%`;
-            document.getElementById('power-value').textContent = `${Math.round(archeryState.drawTension * 100)}%`;
-        }
-
-        function onWindowResize() {
+        function onResize() {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
         }
 
-        window.onload = () => {
-            initEngine();
-
-            document.getElementById('high-score-val').textContent = String(archeryState.highScore).padStart(3, '0');
-            document.getElementById('start-archery-btn').addEventListener('click', startArcheryGame);
-            document.getElementById('start-tour-btn').addEventListener('click', startTourMode);
-
-            document.getElementById('exit-hud-btn').addEventListener('click', endArcheryRound);
-            document.getElementById('exit-tour-btn').addEventListener('click', () => {
-                document.getElementById('tour-hud-overlay').classList.add('hidden');
-                document.getElementById('menu-overlay').classList.remove('hidden');
-            });
-        };
+        window.onload = init;
     </script>
 </body>
 </html>
